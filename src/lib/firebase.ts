@@ -3,13 +3,14 @@ import { getDatabase } from 'firebase/database';
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyDemoKeyForPVZSimulator00000000000',
-  authDomain: 'pvzsimulator-default-rtdb.firebaseapp.com',
-  databaseURL: 'https://pvzsimulator-default-rtdb.firebaseio.com/',
+  apiKey: 'AIzaSyANxccq3iXe6tJQLb_HcqyvPxeYrG9o34g',
+  authDomain: 'pvzsimulator.firebaseapp.com',
+  databaseURL: 'https://pvzsimulator-default-rtdb.firebaseio.com',
   projectId: 'pvzsimulator',
-  storageBucket: 'pvzsimulator.appspot.com',
-  messagingSenderId: '000000000000',
-  appId: '1:000000000000:web:pvzsimulator',
+  storageBucket: 'pvzsimulator.firebasestorage.app',
+  messagingSenderId: '530722160053',
+  appId: '1:530722160053:web:cbc35f0ed56f7351d8adfc',
+  measurementId: 'G-NZ8S86BKC9',
 };
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
