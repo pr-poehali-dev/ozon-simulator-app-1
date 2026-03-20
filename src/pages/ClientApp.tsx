@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react';
 import { PRODUCTS, Product, CartItem, Order, Address, PaymentMethod, createOrder, subscribeUserOrders, STATUS_LABELS, STATUS_COLORS } from '@/lib/store';
 import Icon from '@/components/ui/icon';
 import { QRCodeSVG } from 'qrcode.react';
-
-const USER_ID = 'user_' + Math.random().toString(36).slice(2, 9);
-const USER_NAME = 'Иван Петров';
+import { logoutUser, UserProfile } from '@/lib/auth';
 
 const SAVED_ADDRESSES: Address[] = [
   { id: 'a1', title: '🏠 Дом', street: 'ул. Ленина, 42, кв. 15', city: 'Москва', zip: '101000' },
@@ -20,9 +18,9 @@ const SAVED_PAYMENTS: PaymentMethod[] = [
 
 type Tab = 'catalog' | 'cart' | 'orders' | 'profile';
 
-interface Props { onExit: () => void; }
+interface Props { onExit: () => void; profile: UserProfile; }
 
-export default function ClientApp({ onExit }: Props) {
+export default function ClientApp({ onExit, profile }: Props) {
   const [tab, setTab] = useState<Tab>('catalog');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -32,13 +30,12 @@ export default function ClientApp({ onExit }: Props) {
   const [selectedAddress, setSelectedAddress] = useState<Address>(SAVED_ADDRESSES[0]);
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>(SAVED_PAYMENTS[0]);
   const [orderSuccess, setOrderSuccess] = useState<string | null>(null);
-  const [qrOrderId, setQrOrderId] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   useEffect(() => {
-    const unsub = subscribeUserOrders(USER_ID, setOrders);
+    const unsub = subscribeUserOrders(profile.uid, setOrders);
     return () => unsub();
-  }, []);
+  }, [profile.uid]);
 
   const categories = ['Все', ...Array.from(new Set(PRODUCTS.map(p => p.category)))];
   const filtered = PRODUCTS.filter(p =>
@@ -70,8 +67,8 @@ export default function ClientApp({ onExit }: Props) {
 
   async function placeOrder() {
     const order = {
-      userId: USER_ID,
-      userName: USER_NAME,
+      userId: profile.uid,
+      userName: profile.name,
       items: cart,
       address: selectedAddress,
       payment: selectedPayment,
@@ -419,15 +416,22 @@ export default function ClientApp({ onExit }: Props) {
           <div className="animate-fade-in mt-4">
             <div className="bg-white rounded-3xl p-6 mb-4" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
               <div className="flex items-center gap-4 mb-6">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl text-white font-bold"
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-xl text-white font-bold"
                   style={{ background: 'linear-gradient(135deg, #005BFF, #00D4FF)' }}>
-                  ИП
+                  {profile.name.slice(0, 2).toUpperCase()}
                 </div>
-                <div>
-                  <div className="text-xl font-black">{USER_NAME}</div>
-                  <div className="text-sm text-gray-400">+7 (999) 123-45-67</div>
+                <div className="flex-1">
+                  <div className="text-xl font-black">{profile.name}</div>
+                  <div className="text-sm text-gray-400">{profile.email}</div>
                 </div>
               </div>
+              <button
+                onClick={async () => { await logoutUser(); onExit(); }}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold mb-4 transition-all hover:opacity-80"
+                style={{ background: '#FFF0F0', color: '#FF3F3F', border: '1px solid #FFD0D0' }}>
+                <Icon name="LogOut" size={15} />
+                Выйти из аккаунта
+              </button>
 
               <div className="space-y-3">
                 <h3 className="font-bold text-gray-500 text-xs uppercase tracking-wider">Сохранённые адреса</h3>

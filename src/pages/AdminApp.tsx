@@ -4,6 +4,7 @@ import Icon from '@/components/ui/icon';
 import { Html5Qrcode } from 'html5-qrcode';
 import { get, ref } from 'firebase/database';
 import { db } from '@/lib/firebase';
+import { logoutUser } from '@/lib/auth';
 
 interface Props { onExit: () => void; }
 
@@ -106,8 +107,8 @@ export default function AdminApp({ onExit }: Props) {
       <header className="sticky top-0 z-40"
         style={{ background: 'rgba(8,13,26,0.97)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(0,212,255,0.12)' }}>
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={onExit} style={{ color: 'rgba(255,255,255,0.45)' }}>
-            <Icon name="ChevronLeft" size={24} />
+          <button onClick={async () => { await logoutUser(); onExit(); }} style={{ color: 'rgba(255,255,255,0.45)' }}>
+            <Icon name="LogOut" size={20} />
           </button>
           <div className="flex items-center gap-2 flex-1">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm font-black"
