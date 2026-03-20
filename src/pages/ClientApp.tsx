@@ -533,21 +533,37 @@ function OrderDetail({ order, onBack }: { order: Order; onBack: () => void }) {
         </div>
       </div>
 
-      {/* QR Code — only when ready */}
-      {order.status === 'ready' && (
-        <div className="bg-white rounded-2xl p-6 mb-4 text-center animate-scale-in"
-          style={{ boxShadow: '0 8px 32px rgba(0,200,83,0.2)', border: '2px solid #00C853' }}>
-          <div className="text-green-600 font-bold mb-1">✅ Заказ готов к выдаче!</div>
-          <div className="text-sm text-gray-500 mb-4">Покажите QR-код на пункте выдачи</div>
-          <div className="flex justify-center mb-3">
-            <div className="p-3 bg-white rounded-2xl" style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.12)' }}>
-              <QRCodeSVG value={`OZON-ORDER-${order.id}`} size={160} level="H"
-                imageSettings={{ src: '', x: undefined, y: undefined, height: 0, width: 0, excavate: false }} />
+      {/* QR Code — always visible */}
+      <div className="bg-white rounded-2xl p-6 mb-4 text-center"
+        style={{
+          boxShadow: order.status === 'ready' ? '0 8px 32px rgba(0,200,83,0.25)' : '0 2px 12px rgba(0,0,0,0.06)',
+          border: order.status === 'ready' ? '2px solid #00C853' : '1px solid #E5E7EB'
+        }}>
+        {order.status === 'ready' ? (
+          <>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl mb-3"
+              style={{ background: '#00C85320', color: '#00C853' }}>
+              <span className="text-sm font-bold">✅ Готов к выдаче — покажите QR</span>
             </div>
+          </>
+        ) : (
+          <div className="text-sm text-gray-400 mb-3">
+            QR-код для получения заказа
           </div>
-          <div className="text-xs text-gray-400 font-mono">OZON-{order.id?.slice(-8).toUpperCase()}</div>
+        )}
+        <div className="flex justify-center mb-3">
+          <div className={`p-3 rounded-2xl transition-all duration-500 ${order.status === 'ready' ? '' : 'opacity-40 grayscale'}`}
+            style={{ background: 'white', boxShadow: '0 4px 20px rgba(0,0,0,0.10)' }}>
+            <QRCodeSVG value={`OZON-ORDER-${order.id}`} size={160} level="H" />
+          </div>
         </div>
-      )}
+        <div className="text-xs text-gray-400 font-mono">OZON-{order.id?.slice(-8).toUpperCase()}</div>
+        {order.status !== 'ready' && (
+          <div className="text-xs mt-2" style={{ color: '#9CA3AF' }}>
+            🔒 QR активируется когда заказ готов к выдаче
+          </div>
+        )}
+      </div>
 
       {/* Items */}
       <div className="bg-white rounded-2xl p-5 mb-4" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
