@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { PRODUCTS, Product, CartItem, Order, Address, PaymentMethod, createOrder, subscribeUserOrders, STATUS_LABELS, STATUS_COLORS } from '@/lib/store';
+import { Product, CartItem, Order, Address, PaymentMethod, createOrder, subscribeUserOrders, subscribeProducts, seedDefaultProducts, STATUS_LABELS, STATUS_COLORS } from '@/lib/store';
 import Icon from '@/components/ui/icon';
 import { QRCodeSVG } from 'qrcode.react';
 import { logoutUser, UserProfile } from '@/lib/auth';
@@ -24,6 +24,7 @@ export default function ClientApp({ onExit, profile }: Props) {
   const [tab, setTab] = useState<Tab>('catalog');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('Все');
   const [checkoutStep, setCheckoutStep] = useState(0);
@@ -33,12 +34,18 @@ export default function ClientApp({ onExit, profile }: Props) {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   useEffect(() => {
+    seedDefaultProducts();
+    const unsub = subscribeProducts(setProducts);
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
     const unsub = subscribeUserOrders(profile.uid, setOrders);
     return () => unsub();
   }, [profile.uid]);
 
-  const categories = ['Все', ...Array.from(new Set(PRODUCTS.map(p => p.category)))];
-  const filtered = PRODUCTS.filter(p =>
+  const categories = ['Все', ...Array.from(new Set(products.map(p => p.category)))];
+  const filtered = products.filter(p =>
     (category === 'Все' || p.category === category) &&
     (search === '' || p.name.toLowerCase().includes(search.toLowerCase()))
   );

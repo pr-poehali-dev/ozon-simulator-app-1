@@ -5,6 +5,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { get, ref } from 'firebase/database';
 import { db } from '@/lib/firebase';
 import { logoutUser } from '@/lib/auth';
+import AdminProducts from './AdminProducts';
 
 interface Props { onExit: () => void; }
 
@@ -19,7 +20,7 @@ const STATUS_ICONS: Record<OrderStatus, string> = {
   cancelled: '❌',
 };
 
-type AdminTab = 'orders' | 'scanner';
+type AdminTab = 'orders' | 'scanner' | 'products';
 
 export default function AdminApp({ onExit }: Props) {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -142,6 +143,15 @@ export default function AdminApp({ onExit }: Props) {
               border: tab === 'scanner' ? '1px solid rgba(0,212,255,0.3)' : '1px solid transparent'
             }}>
             <Icon name="Scan" size={16} /> Сканер QR
+          </button>
+          <button onClick={() => setTab('products')}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all"
+            style={{
+              background: tab === 'products' ? 'rgba(0,200,83,0.15)' : 'transparent',
+              color: tab === 'products' ? '#00C853' : 'rgba(255,255,255,0.4)',
+              border: tab === 'products' ? '1px solid rgba(0,200,83,0.3)' : '1px solid transparent'
+            }}>
+            <Icon name="ShoppingBag" size={16} /> Товары
           </button>
         </div>
 
@@ -301,6 +311,9 @@ export default function AdminApp({ onExit }: Props) {
             )}
           </div>
         )}
+
+        {/* ─── PRODUCTS TAB ─── */}
+        {tab === 'products' && <AdminProducts />}
 
         {/* ─── ORDERS TAB ─── */}
         {tab === 'orders' && !selectedOrder && (

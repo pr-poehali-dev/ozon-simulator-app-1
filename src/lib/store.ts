@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { ref, set, push, onValue, update, get } from 'firebase/database';
+import { ref, set, push, onValue, update, get, remove } from 'firebase/database';
 
 export interface Product {
   id: string;
@@ -108,4 +108,41 @@ export function subscribeUserOrders(userId: string, callback: (orders: Order[]) 
       .sort((a, b) => b.createdAt - a.createdAt);
     callback(orders);
   });
+}
+
+export function subscribeProducts(callback: (products: Product[]) => void) {
+  const productsRef = ref(db, 'products');
+  return onValue(productsRef, (snapshot) => {
+    const data = snapshot.val();
+    if (!data) return callback([...PRODUCTS]);
+    const products = Object.values(data) as Product[];
+    callback(products.sort((a, b) => a.name.localeCompare(b.name)));
+  });
+}
+
+export async function createProduct(product: Omit<Product, 'id'>): Promise<string> {
+  const productsRef = ref(db, 'products');
+  const newRef = push(productsRef);
+  await set(newRef, { ...product, id: newRef.key });
+  return newRef.key!;
+}
+
+export async function updateProduct(productId: string, data: Partial<Omit<Product, 'id'>>) {
+  const productRef = ref(db, `products/${productId}`);
+  await update(productRef, data);
+}
+
+export async function deleteProduct(productId: string) {
+  const productRef = ref(db, `products/${productId}`);
+  await remove(productRef);
+}
+
+export async function seedDefaultProducts() {
+  const snapshot = await get(ref(db, 'products'));
+  if (snapshot.exists()) return;
+  const productsRef = ref(db, 'products');
+  for (const p of PRODUCTS) {
+    const newRef = push(productsRef);
+    await set(newRef, { ...p, id: newRef.key });
+  }
 }
