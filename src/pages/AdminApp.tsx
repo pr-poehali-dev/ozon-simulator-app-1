@@ -6,6 +6,8 @@ import { get, ref } from 'firebase/database';
 import { db } from '@/lib/firebase';
 import { logoutUser } from '@/lib/auth';
 import AdminProducts from './AdminProducts';
+import AdminBalance from './AdminBalance';
+import AdminPromo from './AdminPromo';
 
 interface Props { onExit: () => void; }
 
@@ -20,7 +22,7 @@ const STATUS_ICONS: Record<OrderStatus, string> = {
   cancelled: '❌',
 };
 
-type AdminTab = 'orders' | 'scanner' | 'products';
+type AdminTab = 'orders' | 'scanner' | 'products' | 'balance' | 'promo';
 
 export default function AdminApp({ onExit }: Props) {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -152,6 +154,24 @@ export default function AdminApp({ onExit }: Props) {
               border: tab === 'products' ? '1px solid rgba(0,200,83,0.3)' : '1px solid transparent'
             }}>
             <Icon name="ShoppingBag" size={16} /> Товары
+          </button>
+          <button onClick={() => setTab('balance')}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all"
+            style={{
+              background: tab === 'balance' ? 'rgba(16,185,129,0.15)' : 'transparent',
+              color: tab === 'balance' ? '#10b981' : 'rgba(255,255,255,0.4)',
+              border: tab === 'balance' ? '1px solid rgba(16,185,129,0.3)' : '1px solid transparent'
+            }}>
+            <Icon name="Wallet" size={16} /> Баланс
+          </button>
+          <button onClick={() => setTab('promo')}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all"
+            style={{
+              background: tab === 'promo' ? 'rgba(168,85,247,0.15)' : 'transparent',
+              color: tab === 'promo' ? '#a855f7' : 'rgba(255,255,255,0.4)',
+              border: tab === 'promo' ? '1px solid rgba(168,85,247,0.3)' : '1px solid transparent'
+            }}>
+            <Icon name="Tag" size={16} /> Промокоды
           </button>
         </div>
 
@@ -314,6 +334,12 @@ export default function AdminApp({ onExit }: Props) {
 
         {/* ─── PRODUCTS TAB ─── */}
         {tab === 'products' && <AdminProducts />}
+
+        {/* ─── BALANCE TAB ─── */}
+        {tab === 'balance' && <AdminBalance />}
+
+        {/* ─── PROMO TAB ─── */}
+        {tab === 'promo' && <AdminPromo />}
 
         {/* ─── ORDERS TAB ─── */}
         {tab === 'orders' && !selectedOrder && (

@@ -146,3 +146,139 @@ export async function seedDefaultProducts() {
     await set(newRef, { ...p, id: newRef.key });
   }
 }
+
+// ─── BALANCE ───────────────────────────────────────────────────────────────
+
+export interface BalanceTransaction {
+  id: string;
+  amount: number;
+  type: 'credit' | 'debit';
+  description: string;
+  createdAt: number;
+}
+
+export async function getUserBalance(uid: string): Promise<number> {
+  const snap = await get(ref(db, `balances/${uid}/amount`));
+  return snap.exists() ? (snap.val() as number) : 0;
+}
+
+export function subscribeUserBalance(uid: string, callback: (amount: number) => void) {
+  return onValue(ref(db, `balances/${uid}/amount`), (snap) => {
+    callback(snap.exists() ? (snap.val() as number) : 0);
+  });
+}
+
+export async function topUpBalanceByEmail(email: string, amount: number, adminNote: string): Promise<{ success: boolean; userName: string }> {
+  const usersSnap = await get(ref(db, 'users'));
+  if (!usersSnap.exists()) throw new Error('Пользователь не найден');
+  const users = Object.values(usersSnap.val()) as { uid: string; email: string; name: string }[];
+  const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  if (!user) throw new Error('Пользователь с таким email не найден');
+
+  const balRef = ref(db, `balances/${user.uid}/amount`);
+  const curSnap = await get(balRef);
+  const current = curSnap.exists() ? (curSnap.val() as number) : 0;
+  await set(balRef, current + amount);
+
+  const txRef = push(ref(db, `balances/${user.uid}/transactions`));
+  await set(txRef, {
+    id: txRef.key,
+    amount,
+    type: 'credit',
+    description: adminNote || 'Пополнение администратором',
+    createdAt: Date.now(),
+  } as BalanceTransaction);
+
+  return { success: true, userName: user.name };
+}
+
+export async function deductBalance(uid: string, amount: number, description: string) {
+  const balRef = ref(db, `balances/${uid}/amount`);
+  const curSnap = await get(balRef);
+  const current = curSnap.exists() ? (curSnap.val() as number) : 0;
+  if (current < amount) throw new Error('Недостаточно средств на балансе');
+  await set(balRef, current - amount);
+  const txRef = push(ref(db, `balances/${uid}/transactions`));
+  await set(txRef, {
+    id: txRef.key,
+    amount,
+    type: 'debit',
+    description,
+    createdAt: Date.now(),
+  } as BalanceTransaction);
+}
+
+export function subscribeAllBalances(callback: (data: { uid: string; email: string; name: string; balance: number }[]) => void) {
+  return onValue(ref(db, 'users'), async (usersSnap) => {
+    if (!usersSnap.exists()) return callback([]);
+    const users = Object.values(usersSnap.val()) as { uid: string; email: string; name: string; role: string }[];
+    const clients = users.filter(u => u.role === 'client');
+    const balSnap = await get(ref(db, 'balances'));
+    const balances = balSnap.exists() ? balSnap.val() : {};
+    callback(clients.map(u => ({
+      uid: u.uid,
+      email: u.email,
+      name: u.name,
+      balance: balances[u.uid]?.amount ?? 0,
+    })));
+  });
+}
+
+// ─── PROMO CODES ───────────────────────────────────────────────────────────
+
+export type PromoType = 'percent' | 'fixed';
+
+export interface PromoCode {
+  id: string;
+  code: string;
+  type: PromoType;
+  value: number;
+  maxUses: number;
+  usedCount: number;
+  active: boolean;
+  createdAt: number;
+  expiresAt?: number;
+}
+
+export function subscribePromoCodes(callback: (promos: PromoCode[]) => void) {
+  return onValue(ref(db, 'promoCodes'), (snap) => {
+    if (!snap.exists()) return callback([]);
+    const promos = Object.values(snap.val()) as PromoCode[];
+    callback(promos.sort((a, b) => b.createdAt - a.createdAt));
+  });
+}
+
+export async function createPromoCode(promo: Omit<PromoCode, 'id' | 'usedCount' | 'createdAt'>): Promise<string> {
+  const r = push(ref(db, 'promoCodes'));
+  await set(r, { ...promo, id: r.key, usedCount: 0, createdAt: Date.now() });
+  return r.key!;
+}
+
+export async function updatePromoCode(id: string, data: Partial<PromoCode>) {
+  await update(ref(db, `promoCodes/${id}`), data);
+}
+
+export async function deletePromoCode(id: string) {
+  await remove(ref(db, `promoCodes/${id}`));
+}
+
+export async function applyPromoCode(code: string, cartTotal: number): Promise<{ discount: number; promo: PromoCode }> {
+  const snap = await get(ref(db, 'promoCodes'));
+  if (!snap.exists()) throw new Error('Промокод не найден');
+  const promos = Object.values(snap.val()) as PromoCode[];
+  const promo = promos.find(p => p.code.toUpperCase() === code.toUpperCase());
+  if (!promo) throw new Error('Промокод не найден');
+  if (!promo.active) throw new Error('Промокод неактивен');
+  if (promo.usedCount >= promo.maxUses) throw new Error('Промокод исчерпан');
+  if (promo.expiresAt && promo.expiresAt < Date.now()) throw new Error('Промокод истёк');
+  const discount = promo.type === 'percent'
+    ? Math.round(cartTotal * promo.value / 100)
+    : Math.min(promo.value, cartTotal);
+  return { discount, promo };
+}
+
+export async function incrementPromoUsage(promoId: string) {
+  const snap = await get(ref(db, `promoCodes/${promoId}/usedCount`));
+  const count = snap.exists() ? (snap.val() as number) : 0;
+  await update(ref(db, `promoCodes/${promoId}`), { usedCount: count + 1 });
+}

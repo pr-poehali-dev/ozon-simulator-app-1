@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Product, CartItem, Order, Address, PaymentMethod, createOrder, subscribeUserOrders, subscribeProducts, seedDefaultProducts, STATUS_LABELS, STATUS_COLORS } from '@/lib/store';
+import { Product, CartItem, Order, Address, PaymentMethod, PromoCode, createOrder, subscribeUserOrders, subscribeProducts, seedDefaultProducts, subscribeUserBalance, deductBalance, applyPromoCode, incrementPromoUsage, STATUS_LABELS, STATUS_COLORS } from '@/lib/store';
 import Icon from '@/components/ui/icon';
 import { QRCodeSVG } from 'qrcode.react';
 import { logoutUser, UserProfile } from '@/lib/auth';
@@ -32,6 +32,12 @@ export default function ClientApp({ onExit, profile }: Props) {
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>(SAVED_PAYMENTS[0]);
   const [orderSuccess, setOrderSuccess] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [balance, setBalance] = useState(0);
+  const [useBalance, setUseBalance] = useState(false);
+  const [promoInput, setPromoInput] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<{ promo: PromoCode; discount: number } | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [promoLoading, setPromoLoading] = useState(false);
 
   useEffect(() => {
     seedDefaultProducts();
@@ -44,6 +50,11 @@ export default function ClientApp({ onExit, profile }: Props) {
     return () => unsub();
   }, [profile.uid]);
 
+  useEffect(() => {
+    const unsub = subscribeUserBalance(profile.uid, setBalance);
+    return () => unsub();
+  }, [profile.uid]);
+
   const categories = ['Все', ...Array.from(new Set(products.map(p => p.category)))];
   const filtered = products.filter(p =>
     (category === 'Все' || p.category === category) &&
@@ -52,6 +63,24 @@ export default function ClientApp({ onExit, profile }: Props) {
 
   const cartTotal = cart.reduce((s, i) => s + i.product.price * i.quantity, 0);
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
+  const promoDiscount = appliedPromo?.discount ?? 0;
+  const balanceUsed = useBalance ? Math.min(balance, cartTotal - promoDiscount) : 0;
+  const finalTotal = Math.max(0, cartTotal - promoDiscount - balanceUsed);
+
+  async function handleApplyPromo() {
+    if (!promoInput.trim()) return;
+    setPromoLoading(true);
+    setPromoError(null);
+    setAppliedPromo(null);
+    try {
+      const result = await applyPromoCode(promoInput.trim(), cartTotal);
+      setAppliedPromo(result);
+    } catch (e: unknown) {
+      setPromoError(e instanceof Error ? e.message : 'Ошибка');
+    } finally {
+      setPromoLoading(false);
+    }
+  }
 
   function addToCart(product: Product) {
     setCart(prev => {
@@ -79,13 +108,18 @@ export default function ClientApp({ onExit, profile }: Props) {
       items: cart,
       address: selectedAddress,
       payment: selectedPayment,
-      total: cartTotal,
+      total: finalTotal,
       status: 'pending' as const,
       createdAt: Date.now(),
     };
     const id = await createOrder(order);
+    if (balanceUsed > 0) await deductBalance(profile.uid, balanceUsed, `Заказ #${id}`);
+    if (appliedPromo) await incrementPromoUsage(appliedPromo.promo.id);
     setCart([]);
     setCheckoutStep(0);
+    setAppliedPromo(null);
+    setPromoInput('');
+    setUseBalance(false);
     setOrderSuccess(id);
     setTab('orders');
   }
@@ -326,26 +360,113 @@ export default function ClientApp({ onExit, profile }: Props) {
                   </div>
                 </div>
 
+                {/* Promo code */}
+                <div className="bg-white rounded-2xl p-5 mb-4" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Icon name="Tag" size={18} style={{ color: '#a855f7' }} />
+                    <span className="font-bold text-gray-800">Промокод</span>
+                  </div>
+                  {appliedPromo ? (
+                    <div className="flex items-center justify-between px-4 py-3 rounded-xl"
+                      style={{ background: '#f0fdf4', border: '1.5px solid #22c55e' }}>
+                      <div>
+                        <span className="font-mono font-black text-green-700">{appliedPromo.promo.code}</span>
+                        <span className="text-sm text-green-600 ml-2">
+                          −{appliedPromo.discount.toLocaleString()} ₽
+                        </span>
+                      </div>
+                      <button onClick={() => { setAppliedPromo(null); setPromoInput(''); }}
+                        className="text-green-500 hover:text-green-700">
+                        <Icon name="X" size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        value={promoInput}
+                        onChange={e => { setPromoInput(e.target.value.toUpperCase()); setPromoError(null); }}
+                        placeholder="Введите промокод"
+                        className="flex-1 rounded-xl px-4 py-2.5 text-sm outline-none font-mono"
+                        style={{ background: '#F0F4FF', border: '1.5px solid transparent' }}
+                        onKeyDown={e => e.key === 'Enter' && handleApplyPromo()}
+                      />
+                      <button onClick={handleApplyPromo} disabled={promoLoading || !promoInput}
+                        className="px-4 py-2.5 rounded-xl text-sm font-bold transition-all"
+                        style={{ background: promoInput ? '#a855f7' : '#e5e7eb', color: promoInput ? 'white' : '#9ca3af' }}>
+                        {promoLoading ? '...' : 'Применить'}
+                      </button>
+                    </div>
+                  )}
+                  {promoError && (
+                    <div className="mt-2 text-xs text-red-500 flex items-center gap-1">
+                      <Icon name="AlertCircle" size={13} /> {promoError}
+                    </div>
+                  )}
+                </div>
+
+                {/* Balance */}
+                {balance > 0 && (
+                  <div className="bg-white rounded-2xl p-5 mb-4" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Icon name="Wallet" size={18} style={{ color: '#10b981' }} />
+                        <div>
+                          <div className="font-bold text-gray-800">Мой баланс</div>
+                          <div className="text-xs text-gray-400">{balance.toLocaleString()} ₽ доступно</div>
+                        </div>
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <div onClick={() => setUseBalance(v => !v)}
+                          className="w-12 h-6 rounded-full transition-all relative"
+                          style={{ background: useBalance ? '#10b981' : '#e5e7eb' }}>
+                          <div className="w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all shadow"
+                            style={{ left: useBalance ? '26px' : '2px' }} />
+                        </div>
+                        <span className="text-sm font-semibold" style={{ color: useBalance ? '#10b981' : '#9ca3af' }}>
+                          {useBalance ? 'Включён' : 'Выкл'}
+                        </span>
+                      </label>
+                    </div>
+                    {useBalance && balanceUsed > 0 && (
+                      <div className="mt-3 text-sm text-green-600 font-semibold">
+                        Спишется: −{balanceUsed.toLocaleString()} ₽
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Order summary */}
                 <div className="bg-white rounded-2xl p-5 mb-5" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
                   <div className="flex justify-between items-center text-sm text-gray-500 mb-2">
                     <span>Товаров на сумму</span>
                     <span>{cartTotal.toLocaleString()} ₽</span>
                   </div>
+                  {promoDiscount > 0 && (
+                    <div className="flex justify-between items-center text-sm mb-2" style={{ color: '#a855f7' }}>
+                      <span>Промокод {appliedPromo?.promo.code}</span>
+                      <span>−{promoDiscount.toLocaleString()} ₽</span>
+                    </div>
+                  )}
+                  {balanceUsed > 0 && (
+                    <div className="flex justify-between items-center text-sm mb-2 text-green-600">
+                      <span>Баланс</span>
+                      <span>−{balanceUsed.toLocaleString()} ₽</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center text-sm text-gray-500 mb-3">
                     <span>Доставка</span>
                     <span className="text-green-600 font-semibold">Бесплатно</span>
                   </div>
                   <div className="border-t pt-3 flex justify-between items-center">
                     <span className="font-bold">К оплате</span>
-                    <span className="text-2xl font-black" style={{ color: '#005BFF' }}>{cartTotal.toLocaleString()} ₽</span>
+                    <span className="text-2xl font-black" style={{ color: '#005BFF' }}>{finalTotal.toLocaleString()} ₽</span>
                   </div>
                 </div>
 
                 <button onClick={placeOrder}
                   className="w-full py-4 rounded-2xl text-white font-bold text-base transition-all active:scale-98"
                   style={{ background: 'linear-gradient(135deg, #005BFF, #0037CC)', boxShadow: '0 8px 24px rgba(0,91,255,0.35)' }}>
-                  Оплатить {cartTotal.toLocaleString()} ₽
+                  Оплатить {finalTotal.toLocaleString()} ₽
                 </button>
               </div>
             )}
@@ -422,7 +543,7 @@ export default function ClientApp({ onExit, profile }: Props) {
         {tab === 'profile' && (
           <div className="animate-fade-in mt-4">
             <div className="bg-white rounded-3xl p-6 mb-4" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-              <div className="flex items-center gap-4 mb-6">
+              <div className="flex items-center gap-4 mb-4">
                 <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-xl text-white font-bold"
                   style={{ background: 'linear-gradient(135deg, #005BFF, #00D4FF)' }}>
                   {profile.name.slice(0, 2).toUpperCase()}
@@ -431,6 +552,21 @@ export default function ClientApp({ onExit, profile }: Props) {
                   <div className="text-xl font-black">{profile.name}</div>
                   <div className="text-sm text-gray-400">{profile.email}</div>
                 </div>
+              </div>
+              {/* Balance card */}
+              <div className="flex items-center justify-between p-4 rounded-2xl mb-4"
+                style={{ background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', border: '1.5px solid #bbf7d0' }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                    style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                    <Icon name="Wallet" size={20} color="white" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-green-600 font-semibold">Мой баланс</div>
+                    <div className="text-2xl font-black text-green-700">{balance.toLocaleString()} ₽</div>
+                  </div>
+                </div>
+                <div className="text-xs text-green-500">Используется при оплате</div>
               </div>
               <button
                 onClick={async () => { await logoutUser(); onExit(); }}
