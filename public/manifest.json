@@ -1,0 +1,27 @@
+{
+  "name": "OZON Маркетплейс",
+  "short_name": "OZON",
+  "description": "Маркетплейс — заказы и доставка",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#005BFF",
+  "theme_color": "#005BFF",
+  "orientation": "portrait-primary",
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "https://cdn.poehali.dev/projects/184b8c2e-3be3-4606-824e-44ea3848f7a1/files/53d0c2e3-62bb-4f32-b808-3ed99b04129c.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://cdn.poehali.dev/projects/184b8c2e-3be3-4606-824e-44ea3848f7a1/files/53d0c2e3-62bb-4f32-b808-3ed99b04129c.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["shopping"],
+  "screenshots": []
+}

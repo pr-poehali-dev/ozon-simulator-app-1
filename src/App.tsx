@@ -4,6 +4,7 @@ import AdminApp from './pages/AdminApp';
 import AuthScreen from './pages/AuthScreen';
 import { onAuthChange, getUserProfile, UserProfile } from './lib/auth';
 import Icon from './components/ui/icon';
+import InstallAppBanner from './components/InstallAppBanner';
 
 type Mode = 'client' | 'admin' | null;
 
@@ -70,7 +71,7 @@ export default function App() {
     return <AuthScreen mode="admin" onSuccess={handleAuthSuccess} onBack={() => setPendingMode(null)} />;
   }
 
-  if (mode === 'client' && profile) return <ClientApp profile={profile} onExit={handleExit} />;
+  if (mode === 'client' && profile) return <><ClientApp profile={profile} onExit={handleExit} /><InstallAppBanner /></>;
   if (mode === 'admin' && profile) return <AdminApp onExit={handleExit} />;
 
   return (

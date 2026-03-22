@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
     <title>OZON — Интернет-магазин</title>
     <meta name="description" content="OZON симулятор — заказы и доставка"/>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -10,6 +10,30 @@
     <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <meta name="author" content="poehali.dev"/>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json"/>
+    <meta name="theme-color" content="#005BFF"/>
+    <meta name="mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+    <meta name="apple-mobile-web-app-title" content="OZON"/>
+    <link rel="apple-touch-icon" href="https://cdn.poehali.dev/projects/184b8c2e-3be3-4606-824e-44ea3848f7a1/files/53d0c2e3-62bb-4f32-b808-3ed99b04129c.jpg"/>
+    <meta name="msapplication-TileColor" content="#005BFF"/>
+    <meta name="msapplication-TileImage" content="https://cdn.poehali.dev/projects/184b8c2e-3be3-4606-824e-44ea3848f7a1/files/53d0c2e3-62bb-4f32-b808-3ed99b04129c.jpg"/>
+
+    <style>
+      body { overscroll-behavior-y: contain; }
+      * { -webkit-tap-highlight-color: transparent; }
+    </style>
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
     <meta property="og:title" content="Поехали!">
     <meta property="og:description" content="O&ZON Маркетплейс">
     <meta property="og:image:width" content="4800">
