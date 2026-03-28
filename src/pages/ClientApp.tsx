@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react';
-import { Product, CartItem, Order, Address, PaymentMethod, PromoCode, DeliveryType, createOrder, subscribeUserOrders, subscribeProducts, seedDefaultProducts, subscribeUserBalance, subscribeUserAddresses, saveUserAddress, deleteUserAddress, deductBalance, applyPromoCode, incrementPromoUsage, STATUS_LABELS, STATUS_COLORS } from '@/lib/store';
+import { Product, CartItem, Order, Address, PaymentMethod, PromoCode, createOrder, subscribeUserOrders, subscribeProducts, seedDefaultProducts, subscribeUserBalance, deductBalance, applyPromoCode, incrementPromoUsage, STATUS_LABELS, STATUS_COLORS } from '@/lib/store';
 import Icon from '@/components/ui/icon';
 import { QRCodeSVG } from 'qrcode.react';
 import { logoutUser, UserProfile } from '@/lib/auth';
+
+const SAVED_ADDRESSES: Address[] = [
+  { id: 'a1', title: '🏠 Дом', street: 'ул. Ленина, 42, кв. 15', city: 'Москва', zip: '101000' },
+  { id: 'a2', title: '💼 Работа', street: 'ул. Тверская, 10, офис 301', city: 'Москва', zip: '103132' },
+  { id: 'a3', title: '📦 ПВЗ Ozon', street: 'пр. Мира, 150', city: 'Москва', zip: '129085' },
+];
 
 const SAVED_PAYMENTS: PaymentMethod[] = [
   { id: 'p1', type: 'card', label: 'Visa', last4: '4242' },
   { id: 'p2', type: 'card', label: 'Mastercard', last4: '8821' },
   { id: 'p3', type: 'sbp', label: 'СБП — Сбербанк' },
 ];
-
-const PICKUP_ADDRESS: Address = { id: 'pickup', title: '🏪 Самовывоз', street: 'пр. Мира, 150, ПВЗ', city: 'Москва', zip: '129085' };
 
 type Tab = 'catalog' | 'cart' | 'orders' | 'profile';
 
@@ -24,9 +28,7 @@ export default function ClientApp({ onExit, profile }: Props) {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('Все');
   const [checkoutStep, setCheckoutStep] = useState(0);
-  const [deliveryType, setDeliveryType] = useState<DeliveryType>('delivery');
-  const [userAddresses, setUserAddresses] = useState<Address[]>([]);
-  const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
+  const [selectedAddress, setSelectedAddress] = useState<Address>(SAVED_ADDRESSES[0]);
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>(SAVED_PAYMENTS[0]);
   const [orderSuccess, setOrderSuccess] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -36,10 +38,6 @@ export default function ClientApp({ onExit, profile }: Props) {
   const [appliedPromo, setAppliedPromo] = useState<{ promo: PromoCode; discount: number } | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
   const [promoLoading, setPromoLoading] = useState(false);
-  const [orderComment, setOrderComment] = useState('');
-  const [showAddAddress, setShowAddAddress] = useState(false);
-  const [newAddrForm, setNewAddrForm] = useState({ title: '', street: '', city: 'Москва', zip: '' });
-  const [savingAddr, setSavingAddr] = useState(false);
 
   useEffect(() => {
     seedDefaultProducts();
@@ -54,14 +52,6 @@ export default function ClientApp({ onExit, profile }: Props) {
 
   useEffect(() => {
     const unsub = subscribeUserBalance(profile.uid, setBalance);
-    return () => unsub();
-  }, [profile.uid]);
-
-  useEffect(() => {
-    const unsub = subscribeUserAddresses(profile.uid, (addrs) => {
-      setUserAddresses(addrs);
-      if (!selectedAddress && addrs.length > 0) setSelectedAddress(addrs[0]);
-    });
     return () => unsub();
   }, [profile.uid]);
 
@@ -111,33 +101,16 @@ export default function ClientApp({ onExit, profile }: Props) {
     ).filter(i => i.quantity > 0));
   }
 
-  async function handleSaveAddress() {
-    if (!newAddrForm.title.trim() || !newAddrForm.street.trim()) return;
-    setSavingAddr(true);
-    try {
-      await saveUserAddress(profile.uid, newAddrForm);
-      setNewAddrForm({ title: '', street: '', city: 'Москва', zip: '' });
-      setShowAddAddress(false);
-    } finally {
-      setSavingAddr(false);
-    }
-  }
-
-  const effectiveAddress = deliveryType === 'pickup' ? PICKUP_ADDRESS : selectedAddress;
-
   async function placeOrder() {
-    if (deliveryType === 'delivery' && !selectedAddress) return;
     const order = {
       userId: profile.uid,
       userName: profile.name,
       items: cart,
-      address: effectiveAddress!,
+      address: selectedAddress,
       payment: selectedPayment,
       total: finalTotal,
       status: 'pending' as const,
       createdAt: Date.now(),
-      deliveryType,
-      comment: orderComment.trim() || undefined,
     };
     const id = await createOrder(order);
     if (balanceUsed > 0) await deductBalance(profile.uid, balanceUsed, `Заказ #${id}`);
@@ -147,7 +120,6 @@ export default function ClientApp({ onExit, profile }: Props) {
     setAppliedPromo(null);
     setPromoInput('');
     setUseBalance(false);
-    setOrderComment('');
     setOrderSuccess(id);
     setTab('orders');
   }
@@ -340,100 +312,28 @@ export default function ClientApp({ onExit, profile }: Props) {
                   <h2 className="text-xl font-black">Оформление</h2>
                 </div>
 
-                {/* Delivery type toggle */}
-                <div className="bg-white rounded-2xl p-4 mb-4 flex gap-2" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-                  <button onClick={() => setDeliveryType('delivery')}
-                    className="flex-1 py-3 rounded-xl text-sm font-bold transition-all"
-                    style={{ background: deliveryType === 'delivery' ? '#005BFF' : '#F0F4FF', color: deliveryType === 'delivery' ? 'white' : '#555' }}>
-                    🚚 Доставка
-                  </button>
-                  <button onClick={() => setDeliveryType('pickup')}
-                    className="flex-1 py-3 rounded-xl text-sm font-bold transition-all"
-                    style={{ background: deliveryType === 'pickup' ? '#005BFF' : '#F0F4FF', color: deliveryType === 'pickup' ? 'white' : '#555' }}>
-                    🏪 Самовывоз
-                  </button>
-                </div>
-
                 {/* Delivery address */}
-                {deliveryType === 'delivery' && (
-                  <div className="bg-white rounded-2xl p-5 mb-4" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <Icon name="MapPin" size={18} style={{ color: '#005BFF' }} />
-                        <span className="font-bold text-gray-800">Адрес доставки</span>
-                      </div>
-                      <button onClick={() => setShowAddAddress(v => !v)}
-                        className="text-xs font-semibold px-3 py-1.5 rounded-xl transition-all"
-                        style={{ background: '#EEF4FF', color: '#005BFF' }}>
-                        + Добавить
-                      </button>
-                    </div>
-
-                    {showAddAddress && (
-                      <div className="mb-3 p-3 rounded-xl flex flex-col gap-2" style={{ background: '#F8F9FA', border: '1.5px solid #E0E7FF' }}>
-                        <input value={newAddrForm.title} onChange={e => setNewAddrForm(f => ({ ...f, title: e.target.value }))}
-                          placeholder="Название (Дом, Работа...)"
-                          className="w-full px-3 py-2 rounded-lg text-sm outline-none" style={{ background: 'white', border: '1px solid #E5E7EB' }} />
-                        <input value={newAddrForm.street} onChange={e => setNewAddrForm(f => ({ ...f, street: e.target.value }))}
-                          placeholder="Улица, дом, квартира"
-                          className="w-full px-3 py-2 rounded-lg text-sm outline-none" style={{ background: 'white', border: '1px solid #E5E7EB' }} />
-                        <div className="flex gap-2">
-                          <input value={newAddrForm.city} onChange={e => setNewAddrForm(f => ({ ...f, city: e.target.value }))}
-                            placeholder="Город"
-                            className="flex-1 px-3 py-2 rounded-lg text-sm outline-none" style={{ background: 'white', border: '1px solid #E5E7EB' }} />
-                          <input value={newAddrForm.zip} onChange={e => setNewAddrForm(f => ({ ...f, zip: e.target.value }))}
-                            placeholder="Индекс"
-                            className="w-24 px-3 py-2 rounded-lg text-sm outline-none" style={{ background: 'white', border: '1px solid #E5E7EB' }} />
+                <div className="bg-white rounded-2xl p-5 mb-4" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Icon name="MapPin" size={18} style={{ color: '#005BFF' }} />
+                    <span className="font-bold text-gray-800">Адрес доставки</span>
+                  </div>
+                  <div className="space-y-2">
+                    {SAVED_ADDRESSES.map(addr => (
+                      <label key={addr.id} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
+                        style={{ background: selectedAddress.id === addr.id ? '#EEF4FF' : '#F8F9FA', border: `1.5px solid ${selectedAddress.id === addr.id ? '#005BFF' : 'transparent'}` }}>
+                        <input type="radio" checked={selectedAddress.id === addr.id}
+                          onChange={() => setSelectedAddress(addr)} className="hidden" />
+                        <div className={`w-4 h-4 rounded-full border-2 transition-all`}
+                          style={{ borderColor: selectedAddress.id === addr.id ? '#005BFF' : '#ddd', background: selectedAddress.id === addr.id ? '#005BFF' : 'white' }} />
+                        <div>
+                          <div className="text-sm font-semibold">{addr.title}</div>
+                          <div className="text-xs text-gray-500">{addr.street}, {addr.city}</div>
                         </div>
-                        <button onClick={handleSaveAddress} disabled={savingAddr || !newAddrForm.title.trim() || !newAddrForm.street.trim()}
-                          className="py-2 rounded-lg text-sm font-bold text-white transition-all disabled:opacity-50"
-                          style={{ background: '#005BFF' }}>
-                          {savingAddr ? 'Сохранение...' : 'Сохранить адрес'}
-                        </button>
-                      </div>
-                    )}
-
-                    {userAddresses.length === 0 && !showAddAddress ? (
-                      <div className="text-sm text-gray-400 text-center py-2">Нет сохранённых адресов — добавьте</div>
-                    ) : (
-                      <div className="space-y-2">
-                        {userAddresses.map(addr => (
-                          <div key={addr.id} className="flex items-center gap-2">
-                            <label className="flex-1 flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
-                              style={{ background: selectedAddress?.id === addr.id ? '#EEF4FF' : '#F8F9FA', border: `1.5px solid ${selectedAddress?.id === addr.id ? '#005BFF' : 'transparent'}` }}>
-                              <input type="radio" checked={selectedAddress?.id === addr.id}
-                                onChange={() => setSelectedAddress(addr)} className="hidden" />
-                              <div className="w-4 h-4 rounded-full border-2 shrink-0 transition-all"
-                                style={{ borderColor: selectedAddress?.id === addr.id ? '#005BFF' : '#ddd', background: selectedAddress?.id === addr.id ? '#005BFF' : 'white' }} />
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm font-semibold">{addr.title}</div>
-                                <div className="text-xs text-gray-500 truncate">{addr.street}, {addr.city}</div>
-                              </div>
-                            </label>
-                            <button onClick={() => deleteUserAddress(profile.uid, addr.id)}
-                              className="w-8 h-8 flex items-center justify-center rounded-xl shrink-0"
-                              style={{ background: '#FEF2F2', color: '#EF4444' }}>
-                              <Icon name="Trash2" size={14} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                      </label>
+                    ))}
                   </div>
-                )}
-
-                {deliveryType === 'pickup' && (
-                  <div className="bg-white rounded-2xl p-5 mb-4" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Icon name="MapPin" size={18} style={{ color: '#005BFF' }} />
-                      <span className="font-bold text-gray-800">Пункт выдачи</span>
-                    </div>
-                    <div className="p-3 rounded-xl" style={{ background: '#EEF4FF', border: '1.5px solid #005BFF' }}>
-                      <div className="text-sm font-semibold">{PICKUP_ADDRESS.title}</div>
-                      <div className="text-xs text-gray-500">{PICKUP_ADDRESS.street}, {PICKUP_ADDRESS.city}</div>
-                    </div>
-                  </div>
-                )}
+                </div>
 
                 {/* Payment */}
                 <div className="bg-white rounded-2xl p-5 mb-4" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
@@ -535,24 +435,6 @@ export default function ClientApp({ onExit, profile }: Props) {
                   </div>
                 )}
 
-                {/* Comment */}
-                <div className="bg-white rounded-2xl p-5 mb-4" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Icon name="MessageSquare" size={18} style={{ color: '#6366f1' }} />
-                    <span className="font-bold text-gray-800">Комментарий к заказу</span>
-                  </div>
-                  <textarea
-                    value={orderComment}
-                    onChange={e => setOrderComment(e.target.value)}
-                    placeholder="Например: позвоните за 30 минут, домофон не работает..."
-                    rows={3}
-                    className="w-full px-4 py-3 rounded-xl text-sm outline-none resize-none"
-                    style={{ background: '#F0F4FF', border: '1.5px solid transparent' }}
-                    onFocus={e => e.target.style.borderColor = '#6366f1'}
-                    onBlur={e => e.target.style.borderColor = 'transparent'}
-                  />
-                </div>
-
                 {/* Order summary */}
                 <div className="bg-white rounded-2xl p-5 mb-5" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
                   <div className="flex justify-between items-center text-sm text-gray-500 mb-2">
@@ -572,7 +454,7 @@ export default function ClientApp({ onExit, profile }: Props) {
                     </div>
                   )}
                   <div className="flex justify-between items-center text-sm text-gray-500 mb-3">
-                    <span>{deliveryType === 'pickup' ? 'Самовывоз' : 'Доставка'}</span>
+                    <span>Доставка</span>
                     <span className="text-green-600 font-semibold">Бесплатно</span>
                   </div>
                   <div className="border-t pt-3 flex justify-between items-center">
@@ -582,10 +464,9 @@ export default function ClientApp({ onExit, profile }: Props) {
                 </div>
 
                 <button onClick={placeOrder}
-                  disabled={deliveryType === 'delivery' && !selectedAddress}
-                  className="w-full py-4 rounded-2xl text-white font-bold text-base transition-all active:scale-98 disabled:opacity-50"
+                  className="w-full py-4 rounded-2xl text-white font-bold text-base transition-all active:scale-98"
                   style={{ background: 'linear-gradient(135deg, #005BFF, #0037CC)', boxShadow: '0 8px 24px rgba(0,91,255,0.35)' }}>
-                  {deliveryType === 'delivery' && !selectedAddress ? 'Добавьте адрес доставки' : `Оплатить ${finalTotal.toLocaleString()} ₽`}
+                  Оплатить {finalTotal.toLocaleString()} ₽
                 </button>
               </div>
             )}
@@ -858,7 +739,7 @@ function OrderDetail({ order, onBack }: { order: Order; onBack: () => void }) {
       <div className="bg-white rounded-2xl p-5 mb-4" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
         <div className="flex gap-2 mb-1">
           <Icon name="MapPin" size={16} style={{ color: '#005BFF' }} />
-          <span className="text-sm font-bold">{order.deliveryType === 'pickup' ? 'Самовывоз' : 'Адрес доставки'}</span>
+          <span className="text-sm font-bold">Адрес</span>
         </div>
         <div className="text-sm text-gray-500 pl-6">{order.address.street}, {order.address.city}</div>
         <div className="flex gap-2 mt-3 mb-1">
@@ -866,15 +747,6 @@ function OrderDetail({ order, onBack }: { order: Order; onBack: () => void }) {
           <span className="text-sm font-bold">Оплата</span>
         </div>
         <div className="text-sm text-gray-500 pl-6">{order.payment.label} {order.payment.last4 ? `•••• ${order.payment.last4}` : ''}</div>
-        {order.comment && (
-          <>
-            <div className="flex gap-2 mt-3 mb-1">
-              <Icon name="MessageSquare" size={16} style={{ color: '#6366f1' }} />
-              <span className="text-sm font-bold">Комментарий</span>
-            </div>
-            <div className="text-sm text-gray-500 pl-6">{order.comment}</div>
-          </>
-        )}
       </div>
     </div>
   );

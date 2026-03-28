@@ -503,19 +503,12 @@ export default function AdminApp({ onExit }: Props) {
                 <Icon name="User" size={13} style={{ color: 'rgba(255,255,255,0.4)' }} />
                 <span className="text-xs font-semibold text-white">{selectedOrder.userName}</span>
               </div>
-              <div className="flex gap-2 mb-1">
+              <div className="flex gap-2">
                 <Icon name="MapPin" size={13} style={{ color: 'rgba(255,255,255,0.4)' }} />
                 <span className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                  {selectedOrder.deliveryType === 'pickup' ? '🏪 Самовывоз · ' : '🚚 Доставка · '}
                   {selectedOrder.address.street}, {selectedOrder.address.city}
                 </span>
               </div>
-              {selectedOrder.comment && (
-                <div className="flex gap-2">
-                  <Icon name="MessageSquare" size={13} style={{ color: 'rgba(255,255,255,0.4)' }} />
-                  <span className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>{selectedOrder.comment}</span>
-                </div>
-              )}
             </div>
           </div>
         )}

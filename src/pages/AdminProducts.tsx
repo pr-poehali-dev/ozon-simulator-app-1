@@ -63,25 +63,22 @@ export default function AdminProducts() {
   async function handleSave() {
     if (!form.name.trim() || !form.price || !form.category.trim()) return;
     setSaving(true);
-    try {
-      const data = {
-        name: form.name.trim(),
-        price: Number(form.price),
-        image: form.image.trim() || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&q=80',
-        category: form.category.trim(),
-        rating: Math.min(5, Math.max(0, Number(form.rating) || 4.5)),
-        reviews: Math.max(0, Number(form.reviews) || 0),
-        badge: form.badge || undefined,
-      };
-      if (editProduct) {
-        await updateProduct(editProduct.id, data);
-      } else {
-        await createProduct(data);
-      }
-      closeForm();
-    } finally {
-      setSaving(false);
+    const data = {
+      name: form.name.trim(),
+      price: Number(form.price),
+      image: form.image.trim() || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&q=80',
+      category: form.category.trim(),
+      rating: Math.min(5, Math.max(0, Number(form.rating) || 4.5)),
+      reviews: Math.max(0, Number(form.reviews) || 0),
+      badge: form.badge || undefined,
+    };
+    if (editProduct) {
+      await updateProduct(editProduct.id, data);
+    } else {
+      await createProduct(data);
     }
+    setSaving(false);
+    closeForm();
   }
 
   async function handleDelete(id: string) {

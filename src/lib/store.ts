@@ -33,7 +33,6 @@ export interface PaymentMethod {
 }
 
 export type OrderStatus = 'pending' | 'processing' | 'shipped' | 'ready' | 'delivered' | 'cancelled';
-export type DeliveryType = 'delivery' | 'pickup';
 
 export interface Order {
   id: string;
@@ -46,8 +45,6 @@ export interface Order {
   status: OrderStatus;
   createdAt: number;
   qrCode?: string;
-  deliveryType?: DeliveryType;
-  comment?: string;
 }
 
 export const PRODUCTS: Product[] = [
@@ -59,10 +56,6 @@ export const PRODUCTS: Product[] = [
   { id: '6', name: 'Samsung Galaxy S24 Ultra', price: 109990, image: 'https://images.unsplash.com/photo-1707412911484-7b0440f2c1f6?w=400&q=80', category: 'Электроника', rating: 4.8, reviews: 1876, badge: 'Новинка' },
   { id: '7', name: 'Dyson V15 Detect', price: 64990, image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=80', category: 'Бытовая техника', rating: 4.7, reviews: 432 },
   { id: '8', name: 'Levi\'s 501 Original Jeans', price: 7990, image: 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=400&q=80', category: 'Одежда', rating: 4.5, reviews: 5621, badge: '-20%' },
-  { id: '9', name: 'Карандаши цветные 36 шт', price: 349, image: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=400&q=80', category: 'Канцелярия', rating: 4.7, reviews: 892 },
-  { id: '10', name: 'NFC-карта для оплаты', price: 799, image: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=400&q=80', category: 'Электроника', rating: 4.5, reviews: 314, badge: 'Новинка' },
-  { id: '11', name: 'Беспроводная мышка Logitech', price: 2490, image: 'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=400&q=80', category: 'Электроника', rating: 4.8, reviews: 1560 },
-  { id: '12', name: 'Декоративная свеча', price: 590, image: 'https://images.unsplash.com/photo-1603905987975-3f4e574c8ce5?w=400&q=80', category: 'Декор', rating: 4.6, reviews: 430 },
 ];
 
 export const STATUS_LABELS: Record<OrderStatus, string> = {
@@ -146,41 +139,12 @@ export async function deleteProduct(productId: string) {
 
 export async function seedDefaultProducts() {
   const snapshot = await get(ref(db, 'products'));
-  if (snapshot.exists()) {
-    const existing = Object.values(snapshot.val()) as Product[];
-    const existingNames = new Set(existing.map(p => p.name));
-    const productsRef = ref(db, 'products');
-    for (const p of PRODUCTS) {
-      if (!existingNames.has(p.name)) {
-        const newRef = push(productsRef);
-        await set(newRef, { ...p, id: newRef.key });
-      }
-    }
-    return;
-  }
+  if (snapshot.exists()) return;
   const productsRef = ref(db, 'products');
   for (const p of PRODUCTS) {
     const newRef = push(productsRef);
     await set(newRef, { ...p, id: newRef.key });
   }
-}
-
-export function subscribeUserAddresses(userId: string, callback: (addresses: Address[]) => void) {
-  return onValue(ref(db, `userAddresses/${userId}`), (snap) => {
-    if (!snap.exists()) return callback([]);
-    const addresses = Object.values(snap.val()) as Address[];
-    callback(addresses);
-  });
-}
-
-export async function saveUserAddress(userId: string, address: Omit<Address, 'id'>): Promise<string> {
-  const r = push(ref(db, `userAddresses/${userId}`));
-  await set(r, { ...address, id: r.key });
-  return r.key!;
-}
-
-export async function deleteUserAddress(userId: string, addressId: string) {
-  await remove(ref(db, `userAddresses/${userId}/${addressId}`));
 }
 
 // ─── BALANCE ───────────────────────────────────────────────────────────────
